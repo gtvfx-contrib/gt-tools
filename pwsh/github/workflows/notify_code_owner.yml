@@ -1,0 +1,94 @@
+name: Notify Code Owner
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+jobs:
+  notify-code-owner:
+    runs-on: self-hosted
+    permissions:
+      pull-requests: write
+      contents: read
+    
+    steps:
+      - name: Configure Environment
+        run: |
+          echo "::group::Set up Certificates"
+          echo "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - name: Wait for reviewer assignment
+        run: sleep 10
+
+      - name: Notify Assigned Reviewers
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TECHART_PAT }}
+          script: |
+            console.log('🔍 Identifying reviewers whose approval is required...');
+            
+            // Get individual reviewers from the PR payload
+            // These are reviewers whose review has been requested and is still pending
+            const individualReviewers = context.payload.pull_request.requested_reviewers || [];
+            
+            console.log(`👤 Reviewers whose approval is required: ${individualReviewers.length}`);
+            
+            // Build list of reviewers to notify (only individuals whose review is required)
+            const reviewersToNotify = [];
+            
+            // Add individual reviewers whose approval is required
+            individualReviewers.forEach(reviewer => {
+              reviewersToNotify.push('@' + reviewer.login);
+              console.log(`  - ${reviewer.login} (approval required)`);
+            });
+            
+            if (reviewersToNotify.length === 0) {
+              console.log('ℹ️  No required reviewers assigned yet, skipping notification');
+              return;
+            }
+            
+            console.log(`📢 Will notify: ${reviewersToNotify.join(', ')}`);
+            
+            // Get PR details
+            const prTitle = context.payload.pull_request.title;
+            const prUrl = context.payload.pull_request.html_url;
+            
+            // Get files changed count
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            
+            // Create @mention comment on PR
+            const mentions = reviewersToNotify.join(' ');
+            const commentBody = [
+              '## 🔔 Code Owner Review Required',
+              '',
+              mentions + ' - Your review has been requested for this PR.',
+              '',
+              '**PR:** [#' + context.payload.pull_request.number + ' ' + prTitle + '](' + prUrl + ')',
+              '**Files changed:** ' + files.length,
+              '',
+              'Please review when you have a chance. Thank you! 🙏'
+            ].join('\n');
+            
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: commentBody
+              });
+              
+              console.log('✓ Successfully posted notification comment');
+            } catch (error) {
+              console.error('✗ Error posting comment:', error.message);
+              throw error;
+            }

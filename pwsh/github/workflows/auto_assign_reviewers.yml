@@ -1,0 +1,82 @@
+# ==============================================================================
+# Auto-assign Pipeline Team Workflow
+# ==============================================================================
+# Purpose:
+#   Automatically assigns the pipeline team as reviewers when a pull request
+#   is opened, reopened, or marked ready for review. This ensures the pipeline
+#   team has visibility into all code changes.
+#
+# Requirements:
+#   - Self-hosted runner with Node.js 16+
+#   - TECHART_PAT secret with 'repo' and 'read:org' permissions
+#   - SSL certificates configured at /etc/ssl/certs/ca-certificates.crt
+#   - npm packages: parse-diff@0.11.1, fs, path
+#
+# Maintainer: T2TechArt/pipeline_senior
+# Last Updated: 2025-11-07
+# ==============================================================================
+
+name: Auto-assign Pipeline Team
+
+# Trigger on pull request lifecycle events
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+jobs:
+  assign-reviewers:
+    runs-on: self-hosted  # Uses self-hosted runner (requires Node.js)
+    permissions:
+      pull-requests: write  # Required to assign reviewers to PRs
+    
+    steps:
+      # Configure SSL certificates for corporate GitHub Enterprise environment
+      - name: Configure Environment
+        run: |
+          echo "::group::Set up Certificates"
+          echo "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt" >> $GITHUB_ENV
+          echo "::endgroup::"
+
+      # Install Node.js runtime (required for github-script action)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      
+      # Install required npm packages for github-script
+      - run: npm install parse-diff@0.11.1 fs path
+
+      # Assign the pipeline team as reviewers using GitHub API
+      - name: Auto-assign pipeline team
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TECHART_PAT }}  # PAT with org read permissions
+          script: |
+            try {
+              // Skip if PR is in draft state
+              if (context.payload.pull_request.draft) {
+                console.log('ℹ️  PR is in draft state, skipping reviewer assignment');
+                return;
+              }
+              
+              console.log('Assigning pipeline team as reviewers...');
+              console.log('Owner:', context.repo.owner);
+              console.log('Repo:', context.repo.repo);
+              console.log('PR Number:', context.payload.pull_request.number);
+              
+              // Request the 'pipeline' team as reviewers
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                team_reviewers: ['pipeline']
+              });
+              
+              console.log('✓ Successfully assigned pipeline team as reviewers');
+            } catch (error) {
+              console.error('✗ Error assigning team reviewers:', error.message);
+              console.error('Status:', error.status);
+              if (error.response && error.response.data) {
+                console.error('Response:', JSON.stringify(error.response.data));
+              }
+            }
