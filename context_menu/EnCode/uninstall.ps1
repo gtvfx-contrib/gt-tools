@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Uninstalls BLCode context menu entries for the current user.
+    Uninstalls Envoy Code context menu entries for the current user.
 
 .PARAMETER SkipExplorerRestart
     Suppresses the Explorer restart. Use when calling from setup.ps1 which
@@ -17,16 +17,12 @@ Import-Module ContextMenu -Force
 
 $entries = @(
     @{
-        Name   = 'BLCode'
+        Name   = 'EnvoyCode'
         Scopes = @('File', 'Directory', 'Background')
-    },
-    @{
-        Name   = 'builddevpipe'
-        Scopes = @('File')
     }
 )
 
-Write-Host "Removing BLCode context menu items...`n"
+Write-Host "Removing Envoy Code context menu items...`n"
 
 foreach ($entry in $entries) {
     Unregister-ContextMenuItem -Entry $entry

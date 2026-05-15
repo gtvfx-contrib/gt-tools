@@ -68,6 +68,18 @@ try {
     Write-Host "          -> $resolvedTarget"
 } catch [UnauthorizedAccessException] {
     Write-Warning "Insufficient privileges. Re-launching as Administrator..."
-    $argList = "-NonInteractive -File `"$PSCommandPath`" -Target `"$resolvedTarget`" -Path `"$linkPath`""
-    Start-Process powershell -Verb RunAs -ArgumentList $argList -Wait
+    # Embed the New-Item call inline via -EncodedCommand so the elevated
+    # session does not need to resolve the script file — mapped drives
+    # (e.g. V:\) are not available to the elevated token.
+    $escapedLink   = $linkPath.Replace("'", "''")
+    $escapedTarget = $resolvedTarget.Replace("'", "''")
+    $inner   = "New-Item -ItemType SymbolicLink -Path '$escapedLink' -Target '$escapedTarget' -ErrorAction Stop | Out-Null"
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($inner))
+    Start-Process powershell -Verb RunAs -ArgumentList "-NonInteractive -EncodedCommand $encoded" -Wait
+    if (Test-Path $linkPath) {
+        Write-Host "Created symlink   : $linkPath"
+        Write-Host "          -> $resolvedTarget"
+    } else {
+        Write-Error "Elevation succeeded but symlink was not created at: $linkPath"
+    }
 }

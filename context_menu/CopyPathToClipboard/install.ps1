@@ -16,21 +16,21 @@ $ErrorActionPreference = 'Stop'
 $env:PSModulePath = "$(Join-Path $PSScriptRoot '..\..\pwsh\modules');$env:PSModulePath"
 Import-Module ContextMenu -Force
 
-$iconRoot = Join-Path $PSScriptRoot 'icons'
+$iconRoot = Join-Path $PSScriptRoot '..\..\resource\icons'
 
 $entries = @(
     @{
         Name        = 'Copy As Path'
         DisplayName = 'Copy As Path'
         Command     = 'cmd.exe /d /c echo %1| clip'
-        Icon        = "$iconRoot\Blizzard.ico"
+        Icon        = "$iconRoot\gt.ico"
         Scopes      = @('File', 'Directory')
     },
     @{
         Name        = 'Copy As Path'
         DisplayName = 'Copy As Path'
         Command     = 'cmd.exe /d /c echo %V| clip'
-        Icon        = "$iconRoot\Blizzard.ico"
+        Icon        = "$iconRoot\gt.ico"
         Scopes      = @('Background')
     }
 )
