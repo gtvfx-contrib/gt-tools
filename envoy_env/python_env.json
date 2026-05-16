@@ -1,0 +1,3 @@
+{
+    "+=PYTHONSTARTUP": "${__BUNDLE__}/pyinit/pyinit_startup.py"
+}
